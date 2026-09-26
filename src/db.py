@@ -86,4 +86,4 @@ def get_connection():
 if __name__ == "__main__":
     df = query_df("SELECT current_database(), current_schema(), now()")
     print(df)
-    print("✓ Connection successful.")
+    print("[OK] Connection successful.")
