@@ -30,13 +30,13 @@ def get_engine() -> Engine:
     """Return a cached SQLAlchemy engine for the sales data warehouse."""
     url = (
         f"postgresql+psycopg2://"
-        f"{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
-        f"@{os.environ.get('DB_HOST', 'localhost')}:{os.environ.get('DB_PORT', '5432')}"
-        f"/{os.environ['DB_NAME']}"
+        f"{os.environ['PG_USER']}:{os.environ['PG_PASSWORD']}"
+        f"@{os.environ.get('PG_HOST', 'localhost')}:{os.environ.get('PG_PORT', '5432')}"
+        f"/{os.environ['PG_DB']}"
     )
     return create_engine(
         url,
-        connect_args={"options": f"-csearch_path={os.environ.get('DB_SCHEMA', 'gold')}"},
+        connect_args={"options": f"-csearch_path={os.environ.get('PG_SCHEMA', 'gold')}"},
         pool_pre_ping=True,
         echo=False,
     )
