@@ -28,17 +28,17 @@ SELECT
 
     revenue,
     gross_profit,
-    ROUND(gross_profit / NULLIF(revenue, 0) * 100, 2)          AS margin_pct,
+    ROUND((gross_profit / NULLIF(revenue, 0) * 100)::NUMERIC, 2)   AS margin_pct,
 
     qty_sold,
     qty_returned,
-    ROUND(qty_returned / NULLIF(qty_sold, 0) * 100, 2)         AS return_rate_pct,
+    ROUND((qty_returned / NULLIF(qty_sold, 0) * 100)::NUMERIC, 2)  AS return_rate_pct,
     order_count,
 
     -- Share within vehicle model
-    ROUND(
+    ROUND((
         revenue / NULLIF(SUM(revenue) OVER (PARTITION BY vehicle_make_model), 0) * 100
-    , 2)                                                        AS revenue_share_in_model_pct
+    )::NUMERIC, 2)                                                  AS revenue_share_in_model_pct
 
 FROM  base
 ORDER BY vehicle_make_model, revenue DESC;

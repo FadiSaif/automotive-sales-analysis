@@ -7,7 +7,7 @@
 WITH product_metrics AS (
     SELECT
         p.product_key,
-        p.product_name,
+        p.item_name,
         p.part_category,
         p.vehicle_system,
         p.vehicle_make_model,
@@ -19,7 +19,7 @@ WITH product_metrics AS (
 
     FROM      gold.fact_sales    f
     JOIN      gold.dim_product   p  ON f.product_key = p.product_key
-    GROUP BY  p.product_key, p.product_name, p.part_category,
+    GROUP BY  p.product_key, p.item_name, p.part_category,
               p.vehicle_system, p.vehicle_make_model, p.origin_quality
 ),
 
@@ -46,22 +46,22 @@ ranked AS (
 SELECT
     revenue_rank,
     product_key,
-    product_name,
+    item_name,
     part_category,
     vehicle_system,
     origin_quality,
 
     revenue,
-    ROUND(cum_revenue   / NULLIF(total_revenue, 0) * 100, 2) AS cum_revenue_pct,
+    ROUND((cum_revenue   / NULLIF(total_revenue, 0) * 100)::NUMERIC, 2) AS cum_revenue_pct,
     gross_profit,
-    ROUND(cum_profit    / NULLIF(total_profit, 0)  * 100, 2) AS cum_profit_pct,
+    ROUND((cum_profit    / NULLIF(total_profit, 0)  * 100)::NUMERIC, 2) AS cum_profit_pct,
     qty_sold,
 
     -- Classification
     CASE
-        WHEN cum_revenue / NULLIF(total_revenue, 0) <= 0.80 THEN 'A — Vital Few'
-        WHEN cum_revenue / NULLIF(total_revenue, 0) <= 0.95 THEN 'B — Important'
-        ELSE 'C — Trivial Many'
+        WHEN cum_revenue / NULLIF(total_revenue, 0) <= 0.80 THEN 'A - Vital Few'
+        WHEN cum_revenue / NULLIF(total_revenue, 0) <= 0.95 THEN 'B - Important'
+        ELSE 'C - Trivial Many'
     END                                                        AS pareto_class
 
 FROM  ranked
