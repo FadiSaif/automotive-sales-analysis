@@ -1,74 +1,77 @@
 -- ============================================================
--- Executive KPIs — Monthly Performance Dashboard (Realized Baseline)
--- Filter : is_posted = true AND is_released = true (Realized Sales)
--- Metrics: Realized Turnover, Orders, AOV, Gross Margin %, MoM Growth, Backlog Exposure
+-- Executive KPIs — Monthly Performance Dashboard (Corrected Baseline)
+-- Scope  : 100% Confirmed Commercial Sales (Historically Posted + Reconciled Backlog)
+-- Metrics: Corrected Turnover, Reconciled Lift, COGS, Gross Margin %, AOV, Units, Returns, MoM Growth
 -- Source : gold.fact_sales × gold.dim_date × gold.dim_sales_order
 -- ============================================================
 
-WITH monthly_realized AS (
+WITH monthly_summary AS (
     SELECT
         d.year,
         d.month,
-        DATE_TRUNC('month', d.full_date)::DATE              AS month_start,
+        DATE_TRUNC('month', d.full_date)::DATE                               AS month_start,
 
-        -- Realized Revenue & Cost
-        SUM(f.line_total_sar)                                AS realized_revenue,
-        SUM(f.unit_cost_sar * f.quantity)                    AS realized_cogs,
-        SUM(f.discount_amount_sar)                           AS total_discount,
+        -- 1. Dual-Baseline Turnover
+        SUM(CASE 
+            WHEN so.is_posted = true AND so.is_released = true 
+            THEN f.line_total_sar ELSE 0 
+        END)                                                                 AS historically_realized_turnover,
+        SUM(CASE 
+            WHEN so.is_posted = false OR so.is_released = false 
+            THEN f.line_total_sar ELSE 0 
+        END)                                                                 AS reconciled_backlog_turnover,
+        SUM(f.line_total_sar)                                                AS corrected_turnover,
 
-        -- Volume
-        COUNT(DISTINCT f.sales_order_key)                    AS realized_order_count,
-        SUM(f.quantity)                                      AS units_sold,
-        SUM(f.returned_quantity)                             AS units_returned
+        -- 2. Cost & Profitability
+        SUM(f.quantity * f.unit_cost_sar)                                    AS corrected_cogs,
+        SUM(f.line_total_sar - (f.quantity * f.unit_cost_sar))               AS corrected_gross_margin,
+
+        -- 3. Volume Metrics
+        COUNT(DISTINCT so.sales_order_key)                                   AS total_orders,
+        COUNT(f.fact_sales_key)                                              AS total_line_items,
+        SUM(f.quantity)                                                      AS units_sold,
+        SUM(f.returned_quantity)                                             AS units_returned
 
     FROM      gold.fact_sales       f
-    JOIN      gold.dim_date         d   ON f.date_key         = d.date_key
-    JOIN      gold.dim_sales_order  so  ON f.sales_order_key  = so.sales_order_key
-    WHERE     so.is_posted = true 
-      AND     so.is_released = true
+    JOIN      gold.dim_date         d   ON f.date_key        = d.date_key
+    JOIN      gold.dim_sales_order  so  ON f.sales_order_key = so.sales_order_key
     GROUP BY  d.year, d.month, DATE_TRUNC('month', d.full_date)
-),
-monthly_backlog AS (
-    SELECT
-        d.year,
-        d.month,
-        SUM(f.line_total_sar)                                AS unposted_backlog_revenue,
-        COUNT(DISTINCT f.sales_order_key)                    AS backlog_order_count
-    FROM      gold.fact_sales       f
-    JOIN      gold.dim_date         d   ON f.date_key         = d.date_key
-    JOIN      gold.dim_sales_order  so  ON f.sales_order_key  = so.sales_order_key
-    WHERE     so.is_posted = false
-    GROUP BY  d.year, d.month
 )
 
 SELECT
-    r.month_start,
-    r.year,
-    r.month,
+    month_start,
+    year,
+    month,
 
-    -- Confirmed Realized KPIs
-    r.realized_revenue,
-    r.realized_order_count,
-    ROUND((r.realized_revenue / NULLIF(r.realized_order_count, 0))::NUMERIC, 2) AS avg_order_value,
-    r.units_sold,
-    r.units_returned,
-    ROUND((r.units_returned / NULLIF(r.units_sold, 0) * 100)::NUMERIC, 2)       AS return_rate_pct,
-
-    -- Realized Margin
-    r.realized_revenue - r.realized_cogs                                        AS gross_profit,
-    ROUND(((r.realized_revenue - r.realized_cogs) / NULLIF(r.realized_revenue, 0) * 100)::NUMERIC, 2)
-                                                                                AS gross_margin_pct,
-
-    -- Month-over-Month Growth
+    -- Commercial Turnover Waterfall
+    ROUND(historically_realized_turnover::NUMERIC, 2)                        AS historically_realized_turnover,
+    ROUND(reconciled_backlog_turnover::NUMERIC, 2)                           AS reconciled_backlog_turnover,
+    ROUND(corrected_turnover::NUMERIC, 2)                                    AS corrected_turnover,
     ROUND((
-        (r.realized_revenue - LAG(r.realized_revenue) OVER (ORDER BY r.month_start))
-        / NULLIF(LAG(r.realized_revenue) OVER (ORDER BY r.month_start), 0) * 100
-    )::NUMERIC, 2)                                                              AS revenue_mom_growth_pct,
+        reconciled_backlog_turnover::NUMERIC 
+        / NULLIF(historically_realized_turnover, 0) * 100
+    )::NUMERIC, 2)                                                           AS backlog_lift_pct,
 
-    -- Operational Backlog Exposure
-    COALESCE(b.unposted_backlog_revenue, 0)                                     AS unposted_backlog_revenue,
-    COALESCE(b.backlog_order_count, 0)                                          AS backlog_order_count
+    -- Cost of Goods Sold & Margin
+    ROUND(corrected_cogs::NUMERIC, 2)                                        AS corrected_cogs,
+    ROUND(corrected_gross_margin::NUMERIC, 2)                                AS corrected_gross_margin,
+    ROUND((
+        corrected_gross_margin::NUMERIC 
+        / NULLIF(corrected_turnover, 0) * 100
+    )::NUMERIC, 2)                                                           AS gross_margin_pct,
 
-FROM  monthly_realized r
-LEFT JOIN monthly_backlog b ON r.year = b.year AND r.month = b.month
-ORDER BY r.month_start;
+    -- Volume & Basket Performance
+    total_orders,
+    ROUND((corrected_turnover::NUMERIC / NULLIF(total_orders, 0))::NUMERIC, 2) AS avg_order_value_sar,
+    units_sold,
+    units_returned,
+    ROUND((units_returned::NUMERIC / NULLIF(units_sold, 0) * 100)::NUMERIC, 2) AS return_rate_pct,
+
+    -- Month-over-Month Growth (Corrected Turnover)
+    ROUND((
+        (corrected_turnover - LAG(corrected_turnover) OVER (ORDER BY month_start))
+        / NULLIF(LAG(corrected_turnover) OVER (ORDER BY month_start), 0) * 100
+    )::NUMERIC, 2)                                                           AS mom_turnover_growth_pct
+
+FROM  monthly_summary
+ORDER BY month_start;

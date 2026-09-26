@@ -1,7 +1,7 @@
 -- ============================================================
--- Pareto Analysis by Part Category — Realized Baseline
--- Filter : is_posted = true AND is_released = true
--- Source : gold.fact_sales × gold.dim_product × gold.dim_sales_order
+-- Pareto Analysis by Part Category — Corrected Baseline
+-- Scope  : 100% Confirmed Commercial Sales (All 18,028 Line Items)
+-- Source : gold.fact_sales × gold.dim_product
 -- ============================================================
 
 WITH
@@ -12,11 +12,8 @@ WITH
         FROM
             gold.fact_sales s
             JOIN gold.dim_product p ON s.product_key = p.product_key
-            JOIN gold.dim_sales_order so ON s.sales_order_key = so.sales_order_key
         WHERE
-            so.is_posted = true 
-            AND so.is_released = true
-            AND p.part_category NOT IN (
+            p.part_category NOT IN (
                 'Unspecified / Placeholder',
                 'Other Parts & Accessories'
             )
