@@ -1,7 +1,7 @@
 # Comprehensive Data Audit and Assumptions Report
 
 **Target Subject:** Commercial Diagnostic and Data Model Integrity Audit  
-**Business Unit:** Hyundai Bin Abdulwali – Aden  
+**Business Unit:** Commercial Dealership & Aftermarket Parts Division (Aden Branch)  
 **Target Schema:** `gold` (PostgreSQL Data Warehouse)  
 **Period Under Review:** 2023-01-01 to 2025-12-31  
 
